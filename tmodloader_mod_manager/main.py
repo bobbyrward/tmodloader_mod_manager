@@ -54,26 +54,30 @@ def main():
     with tempfile.TemporaryDirectory() as tmpdir:
         root_path = pathlib.Path(tmpdir)
 
-        for mod in mod_spec_pack.mods:
-            if not mod.enabled:
-                continue
+        arguments = [
+            "steamcmd",
+            "+force_install_dir",
+            tmpdir,
+            "+login",
+            "anonymous",
+        ]
 
-            # steamcmd +force_install_dir $PWD/../tmod +login anonymous +workshop_download_item 1281930 $MOD_ID +quit
-            subprocess.check_call(
-                [
-                    "steamcmd",
-                    "+force_install_dir",
-                    tmpdir,
-                    "+login",
-                    "anonymous",
-                    "+workshop_download_item",
-                    TMODLOADER_GAME_ID,
-                    str(mod.workshop_id),
-                    "+quit",
-                ],
-                stdout=subprocess.DEVNULL,
-            )
 
+        enabled_mods = [mod for mod in mod_spec_pack.mods if mod.enabled]
+
+        for mod in enabled_mods:
+            arguments.extend([
+                "+workshop_download_item",
+                TMODLOADER_GAME_ID,
+                str(mod.workshop_id),
+            ])
+
+        arguments.append("+quit")
+
+        # steamcmd +force_install_dir $PWD/../tmod +login anonymous +workshop_download_item 1281930 $MOD_ID +quit
+        subprocess.check_call(arguments)  # stdout=subprocess.DEVNULL,
+
+        for mod in enabled_mods:
             mod_path = root_path / "steamapps" / "workshop" / "content" / TMODLOADER_GAME_ID / str(mod.workshop_id)
             subdirs = [x.name for x in mod_path.iterdir() if x.is_dir()]
             version = None
@@ -102,5 +106,7 @@ def main():
             shutil.copy(mod_files[0].as_posix(), os.path.join(mod_spec_pack.output, mod_files[0].name))
             enabled.add(os.path.splitext(mod_files[0].name)[0])
 
+    # TODO: This should probably be relative to the mod config
+    #       file rather than PWD.
     with open(os.path.join(mod_spec_pack.output, "enabled.json"), "w") as fd:
         json.dump(sorted(enabled), fd)
